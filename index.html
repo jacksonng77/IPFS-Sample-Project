@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <head>
+        <meta charset="utf-8" />
+<script>(function(i,s,o,g,r,a,m){i["GoogleAnalyticsObject"]=r;i[r]=i[r]||function(){(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)})(window,document,"script","https://www.google-analytics.com/analytics.js","ga");ga("create", "UA-105319773-1", {"cookieDomain":"auto"});ga("set", "anonymizeIp", true);ga("send", "pageview");</script>
     <title>IPFS Image Uploader</title>
     <link rel="stylesheet" type="text/css" href="main.css">
 	<link href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' rel='stylesheet' type='text/css'>
 	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.css">
 	<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
 	<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.js"></script>
-	<script src="http://unpkg.com/ipfs-api/dist/index.js"></script>
+	<script src="https://unpkg.com/ipfs-api/dist/index.js"></script>
+	<script src="index.js"></script>
 	<style>
 		input[type="file"] {
     		display: none;
@@ -41,118 +44,5 @@
     	</div>    
     
     </div>
-
-    <script>
-    
-    	$(document).ready( function () {
-
-		} );
-    
-       if (typeof web3 !== 'undefined') {
-            web3 = new Web3(web3.currentProvider);
-        } else {
-            // set the provider you want from Web3.providers
-            web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
-        }
-
-    	ipfs = new window.IpfsApi('ipfs.infura.io', '5001', { protocol: 'https' });
-    	ipfs.id(function(err, res) {
- 			if (err) throw err
- 				console.log("Connected to IPFS node!", res.id, res.agentVersion, res.protocolVersion);
- 		});
-		web3.eth.defaultAccount = web3.eth.accounts[0];
-		var Buffer = window.IpfsApi().Buffer;
-    	var ImageContract = web3.eth.contract(
-			[
-				{
-					"anonymous": false,
-					"inputs": [],
-					"name": "savedHash",
-					"type": "event"
-				},
-				{
-					"constant": false,
-					"inputs": [
-						{
-							"name": "x",
-							"type": "string"
-						}
-					],
-					"name": "setHash",
-					"outputs": [],
-					"payable": false,
-					"stateMutability": "nonpayable",
-					"type": "function"
-				},
-				{
-					"constant": true,
-					"inputs": [],
-					"name": "getHash",
-					"outputs": [
-						{
-							"name": "x",
-							"type": "string"
-						}
-					],
-					"payable": false,
-					"stateMutability": "view",
-					"type": "function"
-				}
-			]
-        );
-    
-
-        var ImageContractCall = ImageContract.at('0xf216028e096c969ec85302651de4584a606e9903');
-        console.log(ImageContractCall);
-    
-    	var ipfsHash;
-    
-        $("#file-upload").change(function() {
-      		$("#loader").show();
-        	var reader = new FileReader();
-  			reader.onload = function() {
-                mybuffer = Buffer.from(this.result);
-            	ipfs.files.add(mybuffer, function(err, result){
-                	if (err) {
-    					console.log("Error");
-  					} 
-                	else {
-                    	ipfsHash = result[0].hash;
-                    	ImageContractCall.setHash(ipfsHash, {gas: 1000000, gasPrice: web3.toWei(2, 'gwei')}, function(error, result){
-   							if(!error){
-                            	$("#tx").html("ETH Tx: " + JSON.stringify(result));
-                			}
-   							else{
-       							console.error(error);
-                			}
-                        });
-  					}
-                });
-			}
-			reader.readAsArrayBuffer(this.files[0]);  	
-        });
-
-    	var savedHash = ImageContractCall.savedHash();
-    	savedHash.watch(function(error, result){
-            if (!error)
-                {
-                	ipfs.pin.add(ipfsHash, function (err) {
-                    	if (err){
-							console.log("cannot pin");
-                        }
-                    	else{
-                        	console.log("pin ok");
-                        }
-                    });
-                    $("#loader").hide();
-                    $("#ipfshash").html("IPFS Hash: " + ipfsHash);
-                    $("#imgdiv").html("<img src=https://gateway.ipfs.io/ipfs/" + ipfsHash + " width='400'>");
-                } else {
-                    $("#loader").hide();
-                }
-        });
-    
-    </script>
-
 </body>
 </html>
