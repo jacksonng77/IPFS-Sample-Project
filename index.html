@@ -1,28 +1,34 @@
 <!DOCTYPE html>
 <head>
-    <meta charset="utf-8" />
-    <title>IPFS Image Uploader</title>
+            <meta charset="utf-8" />
+    <title>Escrow Service Manager</title>
     <link rel="stylesheet" type="text/css" href="main.css">
 	<link href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' rel='stylesheet' type='text/css'>
+	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.css">
+	<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+	<script src="https://unpkg.com/ipfs-api/dist/index.js"></script>
+	<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.js"></script>
 	<style>
 		input[type="file"] {
     		display: none;
 		}
 	</style>
-	<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
-	<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.js"></script>
-	<script src="https://unpkg.com/ipfs-api/dist/index.js"></script>
 </head>
 <body>
     <div class="container">
 
-        <h1>IPFS Image Uploader</h1>
+        <h1>Escrow Service Manager</h1>
 
     	<div class="panel panel-default">
-        	<div class="panel-heading">New Image File</div>
+        	<div class="panel-heading">New Purchase Contract</div>
         	<div class="panel-body">       
             	<div class="form-group">
-                	<label for="file-upload" class="btn btn-primary">
+        			<label for="price">Value in ETH (Twice of price)</label>
+        			<input id="price" class="form-control" type="text" value="2">
+            	</div>
+            	<div class="form-group">
+            	    <label for="file-upload" class="btn btn-primary">
     					<i class="fa fa-cloud-upload"></i> Select Image
 					</label>
                 	<input id="file-upload" type="file"/>
@@ -32,19 +38,55 @@
     	</div>
 
         <div class="panel panel-default">
-        	<div class="panel-heading">Details</div>
+        	<div class="panel-heading">Contract Details</div>
         	<div class="panel-body"> 
-        		<div id="ipfshash"></div>
-        		<div id="tx"></div>
-            	<div id="imgdiv"></div>
+        		<div id="contractaddress"></div>
+        		<div id="itemvalue"></div>
+        		<div id="seller"></div>
+                <div id="buyer"></div>
+                <div id="ipfshash"></div>
+                <div id="ipfsimage"></div>
+                <div id="state"></div>
         	</div>
     	</div>    
     
-    </div>
     
+    	<div class="panel panel-default">
+        	<div class="panel-heading">All Contracts</div>
+            <div class="panel-body"> 
+            	<table id="contractTable" class="display" style="width:100%">
+    			<thead>
+        			<tr>
+            			<th>Address</th>
+        			</tr>
+    			</thead>
+    			<tbody>
+
+    			</tbody>
+				</table>
+        	</div>
+        </div>
+    </div>
+
     <script>
-        
-        $(document).ready( function () {
+    
+    	$(document).ready( function () {
+    		var table = $('#contractTable').DataTable();
+           	$('#contractTable tbody').on( 'click', 'tr', function () {
+        		if ( $(this).hasClass('selected') ) {
+            		$(this).removeClass('selected');
+        		}
+        		else {
+            		table.$('tr.selected').removeClass('selected');
+            		$(this).addClass('selected');
+        		}
+    		} );
+ 
+			$('#contractTable tbody').on('click', 'tr', function () {
+				var data = table.row( this ).data();
+            	$("#contractaddress").html("Contract: " + data[0]);
+				loadContractDetail(data[0]);
+			} );
 		} );
     
        if (typeof web3 !== 'undefined') {
@@ -53,30 +95,36 @@
             // set the provider you want from Web3.providers
             web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
         }
-    	ipfs = new window.IpfsApi('ipfs.infura.io', '5001', { protocol: 'https' });
+	
+	    ipfs = new window.IpfsApi('ipfs.infura.io', '5001', { protocol: 'https' });
     	ipfs.id(function(err, res) {
  			if (err) throw err
  				console.log("Connected to IPFS node!", res.id, res.agentVersion, res.protocolVersion);
  		});
 		web3.eth.defaultAccount = web3.eth.accounts[0];
 		var Buffer = window.IpfsApi().Buffer;
-    	var ImageContract = web3.eth.contract(
+		
+		web3.eth.defaultAccount = web3.eth.accounts[0];
+    	var PurchaseContract = web3.eth.contract(
 			[
 				{
-					"anonymous": false,
+					"constant": true,
 					"inputs": [],
-					"name": "savedHash",
-					"type": "event"
+					"name": "seller",
+					"outputs": [
+						{
+							"name": "",
+							"type": "address"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
 				},
 				{
 					"constant": false,
-					"inputs": [
-						{
-							"name": "x",
-							"type": "string"
-						}
-					],
-					"name": "setHash",
+					"inputs": [],
+					"name": "abort",
 					"outputs": [],
 					"payable": false,
 					"stateMutability": "nonpayable",
@@ -85,11 +133,212 @@
 				{
 					"constant": true,
 					"inputs": [],
-					"name": "getHash",
+					"name": "value",
 					"outputs": [
 						{
-							"name": "x",
+							"name": "",
+							"type": "uint256"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "buyer",
+					"outputs": [
+						{
+							"name": "",
+							"type": "address"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": false,
+					"inputs": [],
+					"name": "confirmReceived",
+					"outputs": [],
+					"payable": false,
+					"stateMutability": "nonpayable",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "state",
+					"outputs": [
+						{
+							"name": "",
+							"type": "uint8"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "ipfsHash",
+					"outputs": [
+						{
+							"name": "",
 							"type": "string"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": false,
+					"inputs": [],
+					"name": "confirmPurchase",
+					"outputs": [],
+					"payable": true,
+					"stateMutability": "payable",
+					"type": "function"
+				},
+				{
+					"inputs": [
+						{
+							"name": "contractSeller",
+							"type": "address"
+						},
+						{
+							"name": "contractHash",
+							"type": "string"
+						}
+					],
+					"payable": true,
+					"stateMutability": "payable",
+					"type": "constructor"
+				},
+				{
+					"anonymous": false,
+					"inputs": [],
+					"name": "Aborted",
+					"type": "event"
+				},
+				{
+					"anonymous": false,
+					"inputs": [],
+					"name": "PurchaseConfirmed",
+					"type": "event"
+				},
+				{
+					"anonymous": false,
+					"inputs": [],
+					"name": "ItemReceived",
+					"type": "event"
+				}
+			]      
+        );
+    
+        var StartEscrowContract = web3.eth.contract(
+        	[
+				{
+					"constant": false,
+					"inputs": [
+						{
+							"name": "contractHash",
+							"type": "string"
+						}
+					],
+					"name": "newPurchase",
+					"outputs": [
+						{
+							"name": "newContract",
+							"type": "address"
+						}
+					],
+					"payable": true,
+					"stateMutability": "payable",
+					"type": "function"
+				},
+				{
+					"anonymous": false,
+					"inputs": [
+						{
+							"indexed": false,
+							"name": "contractAddress",
+							"type": "address"
+						}
+					],
+					"name": "newPurchaseContract",
+					"type": "event"
+				},
+				{
+					"inputs": [],
+					"payable": false,
+					"stateMutability": "nonpayable",
+					"type": "constructor"
+				},
+				{
+					"constant": true,
+					"inputs": [
+						{
+							"name": "",
+							"type": "uint256"
+						}
+					],
+					"name": "contracts",
+					"outputs": [
+						{
+							"name": "",
+							"type": "address"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "getContractCount",
+					"outputs": [
+						{
+							"name": "contractCount",
+							"type": "uint256"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [],
+					"name": "lastContractAddress",
+					"outputs": [
+						{
+							"name": "",
+							"type": "address"
+						}
+					],
+					"payable": false,
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"constant": true,
+					"inputs": [
+						{
+							"name": "pos",
+							"type": "uint256"
+						}
+					],
+					"name": "seePurchase",
+					"outputs": [
+						{
+							"name": "contractAddress",
+							"type": "address"
 						}
 					],
 					"payable": false,
@@ -98,14 +347,59 @@
 				}
 			]
         );
+        var StartEscrow = StartEscrowContract.at('0x05525d0692794ee5a19fa8b259f1100358ffc882');
+        console.log(StartEscrow);
     
-        var ImageContractCall = ImageContract.at('0xf216028e096c969ec85302651de4584a606e9903');
-        console.log(ImageContractCall);
-    
-    	var ipfsHash;
-    
+    	//retrieve all the contracts from the blockchain first
+    	StartEscrow.getContractCount(function(error, result){
+   			if(!error){
+        		console.log(JSON.stringify(result));
+               	var contractCount = Number(result);
+               	var t = $("#contractTable").DataTable();
+               	t.clear();
+                for (var i = 0; i<contractCount; i++){
+                	StartEscrow.contracts(i,function(error, result){
+   					if(!error){
+                    	t.row.add([result]).draw(false);
+            			console.log(JSON.stringify(result));
+           	 		}
+   					else{
+       					console.error(error);
+            		}
+				});
+				}
+			}
+			else{
+				console.error(error);
+            }
+		}); 
+    	var newPurchaseContractEvent = StartEscrow.newPurchaseContract();
+    	newPurchaseContractEvent.watch(function(error, result){
+            if (!error)
+                {
+                    $("#loader").hide();
+                    $("#contractaddress").html("Contract: " + result.args.contractAddress);
+                	loadContractDetail(result.args.contractAddress);
+                	var t = $("#contractTable").DataTable();
+                    t.row.add([result.args.contractAddress]).draw(false);
+                    
+                    ipfs.pin.add(ipfsHash, function (err) {
+                    	if (err){
+							console.log("cannot pin");
+                        }
+                    	else{
+                        	console.log("pin ok");
+                        }
+                    });
+                    
+                } else {
+                    $("#loader").hide();
+                    console.log(error);
+                }
+        });
+        
         $("#file-upload").change(function() {
-            //source:https://stackoverflow.com/questions/29805909/jquery-how-to-check-if-uploaded-file-is-an-image-without-checking-extensions
+        	//source:https://stackoverflow.com/questions/29805909/jquery-how-to-check-if-uploaded-file-is-an-image-without-checking-extensions
             var file = this.files[0];
             var fileType = file["type"];
             var ValidImageTypes = ["image/gif", "image/jpeg", "image/png"];
@@ -113,8 +407,9 @@
                 window.alert("you didn't choose an image");
             }
             else {
-      		$("#loader").show();
-            	var reader = new FileReader();
+                $("#loader").show();
+               
+                var reader = new FileReader();
       			reader.onload = function() {
                     mybuffer = Buffer.from(this.result);
                 	ipfs.files.add(mybuffer, function(err, result){
@@ -123,41 +418,85 @@
       					} 
                     	else {
                         	ipfsHash = result[0].hash;
-                        	ImageContractCall.setHash(ipfsHash, {gas: 1000000, gasPrice: web3.toWei(2, 'gwei')}, function(error, result){
-       							if(!error){
-                                	$("#tx").html("ETH Tx: " + JSON.stringify(result));
-                    			}
-       							else{
-           							console.error(error);
-                    			}
-                            });
+                            StartEscrow.newPurchase(ipfsHash, {value: $("#price").val()*1000000000000000000, gas: 1000000, gasPrice: web3.toWei(2, 'gwei')}, function(error, result){
+           				        if(!error){
+               				        console.log(JSON.stringify(result));
+           				        }
+           				        else{
+               				        console.error(error);
+           				        }
+    			            });
       					}
                     });
     			}
-    			reader.readAsArrayBuffer(this.files[0]);  	
+    			reader.readAsArrayBuffer(this.files[0]);
             }
         });
-    	var savedHash = ImageContractCall.savedHash();
-    	savedHash.watch(function(error, result){
-            if (!error)
-                {
-                	ipfs.pin.add(ipfsHash, function (err) {
-                    	if (err){
-							console.log("cannot pin");
-                        }
-                    	else{
-                        	console.log("pin ok");
-                        }
-                    });
-                    $("#loader").hide();
-                    $("#ipfshash").html("IPFS Hash: " + ipfsHash);
-                    $("#imgdiv").html("<img src=https://gateway.ipfs.io/ipfs/" + ipfsHash + " width='400'>");
-                } else {
-                    $("#loader").hide();
-                }
-        });
-        
-    </script>
     
+    function loadContractDetail(address){
+    	var Purchase = PurchaseContract.at(address);
+    
+    	Purchase.value(function(error, result){
+   			if(!error){
+            	console.log(JSON.stringify(result));
+       			$("#itemvalue").html("Price: " + Number(result)/1000000000000000000);
+            }
+   			else{
+       			console.error(error);
+            }
+		})/18;
+    
+    	Purchase.seller(function(error, result){
+   			if(!error){
+            	console.log(JSON.stringify(result));
+       			$("#seller").html("Seller: " + result);
+            }
+   			else{
+       			console.error(error);
+            }
+		});
+    
+        Purchase.buyer(function(error, result){
+   			if(!error){
+            	console.log(JSON.stringify(result));
+       			$("#buyer").html("Buyer: " + result);
+            }
+   			else{
+       			console.error(error);
+            }
+		});
+
+        Purchase.ipfsHash(function(error, result){
+   			if(!error){
+            	console.log(JSON.stringify(result));
+       			$("#ipfshash").html("IPFS Hash: " + result);
+       			$("#ipfsimage").html("<img src=https://gateway.ipfs.io/ipfs/" + result + " width='400'>");
+            }
+   			else{
+       			console.error(error);
+            }
+		});
+    
+        Purchase.state(function(error, result){
+   			if(!error){
+            	console.log(JSON.stringify(result));
+            	if (Number(result) === 0){
+                	$("#state").html('<span class="badge progress-bar-success">Created</span>');
+                }
+            	else if (Number(result) === 1){
+                	$("#state").html('<span class="badge progress-bar-info">Locked</span>');
+                }
+            	else {
+                	$("#state").html('<span class="badge progress-bar-danger">Inactive</span>');                
+                }
+            }
+   			else{
+       			console.error(error);
+            }
+		});
+    }
+    
+    </script>
+
 </body>
 </html>
